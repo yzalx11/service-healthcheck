@@ -32,9 +32,32 @@ python manage.py runserver 127.0.0.1:8000 --insecure
 
 默认 `DEBUG=False`。访问 [API 首页](http://127.0.0.1:8000/api/) 仍可使用 DRF 的浏览器页面。上面的 `--insecure` 只让 Django 开发服务在调试关闭时提供本地静态文件，例如 DRF 的 CSS 和 JavaScript。404 和 500 返回通用页面，未处理异常的详情留在 Django 服务端日志。
 
-需要固定密钥时，从环境注入 `DJANGO_SECRET_KEY`。未配置时每个进程会生成临时密钥，重启后原有签名数据可能失效。允许的 Host 默认为回环地址和 `localhost`，可用逗号分隔的 `DJANGO_ALLOWED_HOSTS` 覆盖。验收时保持 `DJANGO_DEBUG` 未设置或为 `0`。
+需要固定密钥时，从环境注入 `DJANGO_SECRET_KEY`。未配置时每个进程会生成临时密钥，重启后原有签名数据可能失效。`DJANGO_ALLOWED_HOSTS` 按逗号拆分，去掉每项首尾空白并忽略空项。清理后有值时，使用该列表覆盖默认值。未设置或清理后为空时，允许 `localhost`、`127.0.0.1` 和 `[::1]`。验收时保持 `DJANGO_DEBUG` 未设置或为 `0`。
 
 错误响应和 DRF 页面回归测试可用 VS Code「验收：Django 全量测试」运行，也可单独执行 `python manage.py test inspection.test_error_responses`。
+
+### 本地管理 API 鉴权
+
+`MANAGE_API_AUTH` 与 `DJANGO_DEBUG` 独立。默认关闭管理 API 鉴权，便于在回环地址匿名验收。关闭鉴权时，显式运行 `python manage.py check --deploy` 会显示 `inspection.W003`。
+
+如需手动验收鉴权，先执行过迁移，然后用项目环境运行：
+
+```powershell
+python manage.py createsuperuser --username local-operator
+$env:MANAGE_API_AUTH = '1'
+python manage.py runserver 127.0.0.1:8000 --insecure
+```
+
+在另一个终端检验匿名和已登录访问。第二条命令会提示输入密码。
+
+```powershell
+curl.exe -i http://127.0.0.1:8000/api/
+curl.exe -i --user local-operator http://127.0.0.1:8000/api/
+```
+
+匿名请求返回 401，有效 Django 用户凭据可访问管理 API，包括日报、巡检历史和按需巡检。受控探测目标 `/probe-health/{id}/` 仍要求该服务自己的 Bearer Token。上述 HTTP Basic 验收仅在本机回环服务上运行。恢复匿名验收时，将 `MANAGE_API_AUTH` 设为 `0` 后重启服务。
+
+专项测试可执行 `python manage.py test inspection.test_manage_api_auth`，也包含在 VS Code 的「验收：Django 全量测试」中。
 
 ## 接口
 

@@ -26,3 +26,16 @@ def check_origin_settings(app_configs, **kwargs):
             )
         )
     return warnings
+
+
+def check_manage_api_auth(app_configs, **kwargs):
+    if settings.MANAGE_API_AUTH:
+        return []
+    return [
+        Warning(
+            "Management API authentication is disabled.",
+            hint="This mode is for loopback acceptance. Set MANAGE_API_AUTH=1 to require credentials.",
+            obj="MANAGE_API_AUTH",
+            id="inspection.W003",
+        )
+    ]

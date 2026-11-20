@@ -1,3 +1,9 @@
+import json
+import os
+import subprocess
+import sys
+
+from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 from django.urls import path
 
@@ -35,3 +41,53 @@ class ErrorResponseTests(SimpleTestCase):
             self.assertNotContains(response, detail, status_code=500)
         self.assertIsInstance(logs.records[0].exc_info[1], RuntimeError)
         self.assertIn("server-only error detail", logs.output[0])
+
+
+class AllowedHostsConfigurationTests(SimpleTestCase):
+    def read_host_configuration(self, value):
+        environment = os.environ.copy()
+        environment.update(DJANGO_SETTINGS_MODULE="healthcheck.settings", DJANGO_DEBUG="0")
+        if value is None:
+            environment.pop("DJANGO_ALLOWED_HOSTS", None)
+        else:
+            environment["DJANGO_ALLOWED_HOSTS"] = value
+        result = subprocess.run(
+            [sys.executable, "-c", """
+import json
+import django
+
+django.setup()
+from django.conf import settings
+from django.test import Client
+
+client = Client()
+print(json.dumps({
+    "hosts": settings.ALLOWED_HOSTS,
+    "loopback_status": client.get("/api/", HTTP_HOST="127.0.0.1").status_code,
+    "custom_status": client.get("/api/", HTTP_HOST="review.example").status_code,
+}))
+"""],
+            cwd=settings.BASE_DIR,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_unset_or_empty_configuration_falls_back_to_loopback_hosts(self):
+        for value in (None, "", " ,  , "):
+            with self.subTest(value=value):
+                self.assertEqual(self.read_host_configuration(value), {
+                    "hosts": ["localhost", "127.0.0.1", "[::1]"],
+                    "loopback_status": 200,
+                    "custom_status": 400,
+                })
+
+    def test_nonempty_configuration_replaces_defaults(self):
+        self.assertEqual(self.read_host_configuration(" , review.example,  "), {
+            "hosts": ["review.example"],
+            "loopback_status": 400,
+            "custom_status": 200,
+        })

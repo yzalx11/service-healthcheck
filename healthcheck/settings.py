@@ -6,10 +6,11 @@ from django.core.management.utils import get_random_secret_key
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or get_random_secret_key()
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+MANAGE_API_AUTH = os.environ.get("MANAGE_API_AUTH", "0") == "1"
 ALLOWED_HOSTS = [
-    host for value in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
+    host for value in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
     if (host := value.strip())
-]
+] or ["localhost", "127.0.0.1", "[::1]"]
 ROOT_URLCONF = "healthcheck.urls"
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -57,6 +58,8 @@ CELERY_TASK_IGNORE_RESULT = True
 PROBE_TOKEN_ENCRYPTION_KEY = os.environ.get("PROBE_TOKEN_ENCRYPTION_KEY")
 MANAGED_PROBE_ORIGIN = os.environ.get("MANAGED_PROBE_ORIGIN")
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.BasicAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["inspection.permissions.ManageApiPermission"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
