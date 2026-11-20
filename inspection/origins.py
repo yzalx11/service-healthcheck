@@ -4,6 +4,7 @@ from unicodedata import category
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 
 _AUTHORITY = re.compile(r"(?:\[[0-9a-fA-F:.]+\]|[^:\[\]@]+)(?::[0-9]+)?")
@@ -36,20 +37,32 @@ def origin_key(value):
     host = parsed.hostname
     if parsed.netloc.startswith("["):
         host = IPv6Address(host).compressed
-    elif not _valid_dns_host(host):
-        return None
+    else:
+        host = _dns_host_key(host)
+        if host is None:
+            return None
     return parsed.scheme, host, port
 
 
-def _valid_dns_host(host):
+def _dns_host_key(host):
     try:
-        hostname = host.removesuffix(".").encode("idna").decode("ascii")
+        hostname = host.removesuffix(".").encode("idna").decode("ascii").lower()
         labels = hostname.split(".")
         if len(labels) > 1 and all(label.isdigit() for label in labels):
             IPv4Address(hostname)
     except (UnicodeError, ValueError):
-        return False
-    return len(hostname) <= 253 and all(_DNS_LABEL.fullmatch(label) for label in labels)
+        return None
+    if len(hostname) > 253 or not all(_DNS_LABEL.fullmatch(label) for label in labels):
+        return None
+    return hostname + "." if host.endswith(".") else hostname
+
+
+def validate_origin_syntax(value):
+    if origin_key(value) is None:
+        raise ValidationError(
+            "Use an HTTP(S) origin with a valid host and optional port, without a path or credentials.",
+            code="invalid",
+        )
 
 
 def allowed_origin_keys():
