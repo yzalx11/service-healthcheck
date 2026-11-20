@@ -6,15 +6,18 @@ from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Environment, Service, Team
+from .models import DailyHealthRate, Environment, Service, Team
 from .origins import allowed_origin_keys, origin_key
 from .probe_tokens import is_managed_probe, token_cipher
 from .probes import check_service
 from .serializers import (
+    DailyHealthReportFilterSerializer,
+    DailyHealthReportSerializer,
     EnvironmentSerializer,
     InspectionResultSerializer,
     ServiceSerializer,
@@ -81,3 +84,21 @@ class ServiceViewSet(InspectionModelViewSet):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         return Response(InspectionResultSerializer(result).data, status=status.HTTP_201_CREATED)
+
+
+class DailyHealthReportViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    queryset = DailyHealthRate.objects.order_by("-date", "service_id")
+    serializer_class = DailyHealthReportSerializer
+
+    def get_queryset(self):
+        columns = {"date": "date", "environment": "environment_name", "team": "team_name"}
+        params = self.request.query_params
+        unknown = set(params) - columns.keys() - {"page", "format"}
+        if unknown:
+            raise ValidationError({"unknown_parameters": sorted(unknown)})
+
+        filters = DailyHealthReportFilterSerializer(data=params.dict())
+        filters.is_valid(raise_exception=True)
+        return super().get_queryset().filter(
+            **{columns[name]: value for name, value in filters.validated_data.items()}
+        )
