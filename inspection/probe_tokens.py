@@ -1,9 +1,9 @@
-from urllib.parse import urlsplit
-
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse
+
+from .origins import origin_key
 
 
 def token_cipher():
@@ -17,10 +17,10 @@ def token_cipher():
 
 
 def is_managed_probe(service):
-    configured_origin = (settings.MANAGED_PROBE_ORIGIN or "").removesuffix("/")
-    if not configured_origin or service.origin.removesuffix("/") != configured_origin:
+    key = origin_key(service.origin)
+    if key is None or key != origin_key(settings.MANAGED_PROBE_ORIGIN):
         return False
-    origin = urlsplit(service.origin)
-    if origin.scheme != "https" and origin.hostname not in {"127.0.0.1", "::1"}:
+    scheme, host, _ = key
+    if scheme != "https" and host not in {"127.0.0.1", "::1"}:
         return False
     return service.health_path == reverse("managed-probe-health", args=[service.pk])
