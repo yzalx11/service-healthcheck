@@ -1,0 +1,27 @@
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-local-development")
+DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+ROOT_URLCONF = "healthcheck.urls"
+INSTALLED_APPS = [
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "rest_framework",
+    "inspection",
+]
+MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
+DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+TIME_ZONE = "Asia/Shanghai"
+USE_TZ = True
+PROBE_ALLOWED_ORIGINS = os.environ.get(
+    "PROBE_ALLOWED_ORIGINS", "http://127.0.0.1:9001"
+).split()
+PROBE_TIMEOUT_SECONDS = 3
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+}
