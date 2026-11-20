@@ -56,7 +56,9 @@ $service = Invoke-RestMethod "$api/services/" -Method Post -ContentType 'applica
 Invoke-RestMethod "$api/services/$($service.id)/check/" -Method Post
 ```
 
-预期返回 `outcome: healthy` 和 `status_code: 200`。将 `health_path` 改为不存在的路径可验证 `http_error`。默认允许探测 `http://127.0.0.1:9001`。如需测试其他受信任的源，启动 Django 前用空格分隔配置 `PROBE_ALLOWED_ORIGINS`。每个源由协议、主机和可选端口组成，单个尾斜杠可以省略。
+预期返回 `outcome: healthy` 和 `status_code: 200`。将 `health_path` 改为不存在的路径可验证 `http_error`。默认允许探测 `http://127.0.0.1:9001`。如需测试其他受信任的源，启动 Django 前用空格分隔配置 `PROBE_ALLOWED_ORIGINS`。每个源由协议、主机和可选端口组成。比较时忽略协议和主机名的大小写以及单个尾斜杠。省略端口和显式写出默认端口仍分别匹配。
+
+支持 `http://paysvc:8080` 这类内网短主机名。运行 Django 的环境需要能解析该名称。主机名末尾的点会保留，`paysvc` 和 `paysvc.` 分别匹配白名单。Origin 内的空白和控制字符会被拒绝。
 
 ## 第二阶段验收
 
@@ -82,7 +84,7 @@ Worker 和 beat 都随 `celery[redis]` 安装，分别作为两个进程运行�
 & .\.conda\python.exe test_celery_chain.py --redis-server 'D:\redis\Redis-x64-3.2.100\redis-server.exe'
 ```
 
-也可以打开 VS Code 的「运行和调试」，选择「验收：Django 全量测试」或「验收：Celery 完整链路」，按 `Ctrl+F5` 运行。Django 全量测试预期显示 `Ran 15 tests` 和 `OK`，无需提前启动 Django。链路测试会提示 Redis 程序路径，本机可直接使用默认值。
+也可以打开 VS Code 的「运行和调试」，选择「验收：Django 全量测试」或「验收：Celery 完整链路」，按 `Ctrl+F5` 运行。Django 全量测试预期显示 `OK`，无需提前启动 Django。链路测试会提示 Redis 程序路径，本机可直接使用默认值。
 
 `test_celery_chain.py` 会临时启动 Redis、单进程 worker 和独立 beat。它只在测试子进程中把调度间隔缩短为两秒，读回临时数据库中的加密 Token 和健康率后自动关闭服务。正式调度时刻由 `inspection/test_tasks.py` 单独验证。项目限制 Celery 和 Kombu 在 5.6 系列，以兼容这台 Windows 机器的 Redis 3.2。该组合用于本地验收。
 

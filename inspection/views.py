@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Environment, Service, Team
+from .origins import allowed_origin_keys, origin_key
 from .probe_tokens import is_managed_probe, token_cipher
 from .probes import check_service
 from .serializers import (
@@ -18,7 +19,6 @@ from .serializers import (
     InspectionResultSerializer,
     ServiceSerializer,
     TeamSerializer,
-    origin_is_allowed,
 )
 
 
@@ -68,7 +68,7 @@ class ServiceViewSet(InspectionModelViewSet):
     @action(detail=True, methods=["post"])
     def check(self, request, pk=None):
         service = self.get_object()
-        if not origin_is_allowed(service.origin):
+        if origin_key(service.origin) not in allowed_origin_keys():
             return Response(
                 {"detail": "Origin is not enabled for inspections."},
                 status=status.HTTP_409_CONFLICT,

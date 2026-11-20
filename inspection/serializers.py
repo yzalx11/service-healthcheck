@@ -1,17 +1,7 @@
-from urllib.parse import urlsplit
-
-from django.conf import settings
 from rest_framework import serializers
 
 from .models import Environment, InspectionResult, Service, Team
-
-
-def origin_is_allowed(origin):
-    normalized_origin = origin.removesuffix("/")
-    return any(
-        configured.removesuffix("/") == normalized_origin
-        for configured in settings.PROBE_ALLOWED_ORIGINS
-    )
+from .origins import allowed_origin_keys, origin_key
 
 
 class EnvironmentSerializer(serializers.ModelSerializer):
@@ -27,6 +17,8 @@ class TeamSerializer(serializers.ModelSerializer):
 
 
 class ServiceSerializer(serializers.ModelSerializer):
+    origin = serializers.CharField(max_length=200, trim_whitespace=False)
+
     class Meta:
         model = Service
         fields = ["id", "name", "environment", "team", "origin", "health_path"]
@@ -39,26 +31,14 @@ class ServiceSerializer(serializers.ModelSerializer):
         return instance
 
     def validate_origin(self, value):
-        try:
-            parsed = urlsplit(value)
-            port = parsed.port
-        except ValueError as exc:
-            raise serializers.ValidationError("Invalid origin.") from exc
-        if (
-            parsed.scheme not in {"http", "https"}
-            or not parsed.hostname
-            or parsed.username is not None
-            or port == 0
-            or parsed.path not in {"", "/"}
-            or "?" in value
-            or "#" in value
-            or "\\" in value
-        ):
-            raise serializers.ValidationError("Use an HTTP(S) origin without a path or credentials.")
-        origin = value.rstrip("/")
-        if not origin_is_allowed(origin):
+        key = origin_key(value)
+        if key is None:
+            raise serializers.ValidationError(
+                "Use an HTTP(S) origin with a valid host and optional port, without a path or credentials."
+            )
+        if key not in allowed_origin_keys():
             raise serializers.ValidationError("Origin is not enabled for inspections.")
-        return origin
+        return value.removesuffix("/")
 
     def validate_health_path(self, value):
         if (
