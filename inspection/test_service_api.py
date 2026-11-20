@@ -132,6 +132,39 @@ class ServiceApiTests(TestCase):
             response = self.client.put(url, payload, format="json")
             self.assertEqual(response.status_code, 200, response.data)
 
+    def test_ipv6_allowlist_matches_compressed_and_expanded_forms(self):
+        compressed = "http://[::1]:8080"
+        expanded = "http://[0:0:0:0:0:0:0:1]:8080"
+        for allowed, submitted in ((compressed, expanded), (expanded, compressed)):
+            with self.subTest(allowed=allowed), override_settings(PROBE_ALLOWED_ORIGINS=[allowed]):
+                payload = {**self.payload, "origin": submitted}
+                response = self.client.put(self.service_url, payload, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+
+    def test_expanded_ipv6_loopback_sends_managed_probe_token(self):
+        origin = "http://[0:0:0:0:0:0:0:1]:8080"
+        path = f"/probe-health/{self.service.pk}/"
+        key = Fernet.generate_key()
+        self.service.origin = origin
+        self.service.health_path = path
+        self.service.token_ciphertext = Fernet(key).encrypt(b"test-token")
+        self.service.save(update_fields=["origin", "health_path", "token_ciphertext"])
+
+        with override_settings(
+            MANAGED_PROBE_ORIGIN=origin,
+            PROBE_ALLOWED_ORIGINS=[origin],
+            PROBE_TOKEN_ENCRYPTION_KEY=key,
+        ), patch("inspection.probes.HTTPConnection") as connection:
+            upstream = connection.return_value
+            upstream.getresponse.return_value.__enter__.return_value.status = 204
+            response = self.client.post(self.service_url + "check/")
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["status_code"], 204)
+        upstream.request.assert_called_once_with(
+            "GET", path, headers={"Authorization": "Bearer test-token"},
+        )
+
     def test_short_hostname_can_be_registered_and_checked(self):
         with override_settings(PROBE_ALLOWED_ORIGINS=["HTTP://PAYSVC:8080/"]):
             created = self.client.post(

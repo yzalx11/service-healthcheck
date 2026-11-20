@@ -1,5 +1,5 @@
 import re
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from unicodedata import category
 from urllib.parse import urlsplit
 
@@ -34,8 +34,9 @@ def origin_key(value):
         return None
 
     host = parsed.hostname
-    # urlsplit validates bracketed IPv6. DNS labels are checked separately to allow short names.
-    if not parsed.netloc.startswith("[") and not _valid_dns_host(host):
+    if parsed.netloc.startswith("["):
+        host = IPv6Address(host).compressed
+    elif not _valid_dns_host(host):
         return None
     return parsed.scheme, host, port
 
