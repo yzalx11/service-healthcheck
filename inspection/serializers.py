@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Environment, InspectionResult, Service, Team
+from .models import DailyHealthRate, Environment, InspectionResult, Service, Team
 from .origins import allowed_origin_keys, origin_key
 
 
@@ -68,3 +68,21 @@ class InspectionHistoryFilterSerializer(serializers.Serializer):
         if "since" in attrs and "until" in attrs and attrs["since"] >= attrs["until"]:
             raise serializers.ValidationError({"until": "Must be later than since."})
         return attrs
+
+
+class DailyHealthReportFilterSerializer(serializers.Serializer):
+    date = serializers.DateField(required=False)
+    environment = serializers.ChoiceField(choices=Environment.Name.choices, required=False)
+    team = serializers.CharField(max_length=100, trim_whitespace=False, required=False)
+
+
+class DailyHealthReportSerializer(serializers.ModelSerializer):
+    health_rate = serializers.FloatField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = DailyHealthRate
+        fields = [
+            "date", "service", "environment_name", "team_name",
+            "successful_checks", "total_checks", "health_rate",
+        ]
+        read_only_fields = fields

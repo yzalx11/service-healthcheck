@@ -14,7 +14,7 @@
 | 每日 00:00 按环境和团队统计健康率并入库 | [调度](healthcheck/celery.py)、[任务](inspection/tasks.py) | `python manage.py test inspection.test_tasks`，再运行 [Celery 完整链路验收](#验收-redisworker-与-beat) |
 | Django 请求耗时中间件 | [中间件](healthcheck/middleware.py) | `python manage.py test inspection.test_request_timing` |
 
-北京时间 00:00 的近 24 小时对应前一个自然日。日报固定该日期的边界，方便停机后补跑。
+北京时间 00:00 的近 24 小时对应前一个自然日。日报固定该日期的边界，方便停机后补跑。已生成的日报可通过 [只读日报列表](#只读日报列表) 查询。
 
 ## 本地运行
 
@@ -85,6 +85,24 @@ Invoke-RestMethod "$api/services/$($service.id)/check/" -Method Post
 国际化域名按 Python 内置的 IDNA2003 规则匹配。Unicode 域名与按该规则生成的 ASCII 写法等价。部分域名在 IDNA2008 下的结果不同，例如 `straße.de` 在这里匹配 `strasse.de`，而 IDNA2008 的 ASCII 写法是 `xn--strae-oqa.de`。
 
 修改 `PROBE_ALLOWED_ORIGINS` 或 `MANAGED_PROBE_ORIGIN` 后，可以运行 `python manage.py check` 检查配置。无效的白名单条目会报 `inspection.W001` 并被忽略，无效的受控目标会报 `inspection.W002` 并禁用受控探测。告警以配置名开头，省略原始值。更新到此版本后运行 `python manage.py migrate` 应用服务模型字段迁移。
+
+## 只读日报列表
+
+使用 `GET /api/reports/` 查看已入库的日报。三个查询参数都可省略，组合时取交集。
+
+| 参数 | 格式 |
+| --- | --- |
+| `date` | 报表日期，`YYYY-MM-DD` |
+| `environment` | `dev`、`test` 或 `prod` |
+| `team` | 报表中的团队全名，精确匹配 |
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:8000/api/reports/?date=2026-11-20&environment=dev&team=Site%20Operations'
+```
+
+每条记录返回日期、服务 ID、生成日报时的环境和团队、成功次数、总次数及 `health_rate`。健康率是 0 到 1 的比例，例如 `0.75` 表示 75%。没有巡检时为 `null`。结果按日期倒序、同一天按服务 ID 升序，每页 20 条。可继续使用 `page` 分页和 `format=json` 选择响应格式。未知查询参数会以 `unknown_parameters` 返回 400。合法筛选没有匹配记录时返回空列表，写请求返回 405。
+
+在 VS Code「运行和调试」选择「验收：只读日报列表」，按 `Ctrl+F5`。预期显示 `Ran 6 tests` 和 `OK`。专项测试用临时数据库准备日报，无需启动 Django 开发服务或 Redis。
 
 ## 第二阶段验收
 
