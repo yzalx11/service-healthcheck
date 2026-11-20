@@ -7,7 +7,7 @@
             "request": "launch",
             "python": "${workspaceFolder}/.conda/python.exe",
             "program": "${workspaceFolder}/manage.py",
-            "args": ["test", "inspection.test_tasks"],
+            "args": ["test", "inspection"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         },

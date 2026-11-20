@@ -13,8 +13,8 @@ app.conf.beat_schedule = {
         "task": "inspection.tasks.rotate_probe_tokens",
         "schedule": crontab(minute=0, hour="*/8"),
     },
-    "write-daily-health-rates": {
-        "task": "inspection.tasks.write_daily_health_rates",
-        "schedule": crontab(minute=0, hour=0),
+    "catch-up-daily-health-rates": {
+        "task": "inspection.tasks.catch_up_daily_health_rates",
+        "schedule": crontab(minute=0),
     },
 }

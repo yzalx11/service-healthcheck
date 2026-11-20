@@ -64,7 +64,7 @@ Worker 和 beat 都随 `celery[redis]` 安装，分别作为两个进程运行�
 
 ```powershell
 & .\.conda\python.exe -m pip install -r requirements.txt
-& .\.conda\python.exe manage.py test inspection.test_tasks
+& .\.conda\python.exe manage.py test inspection
 & .\.conda\python.exe test_celery_chain.py --redis-server 'D:\redis\Redis-x64-3.2.100\redis-server.exe'
 ```
 
@@ -81,4 +81,6 @@ python -m celery -A healthcheck worker --loglevel=INFO
 python -m celery -A healthcheck beat --loglevel=INFO
 ```
 
-无需等到整点即可验证 Redis 转发。在相同环境执行 `python manage.py shell -c "from inspection.tasks import rotate_probe_tokens, write_daily_health_rates; rotate_probe_tokens.delay(); write_daily_health_rates.delay()"`，检查 worker 日志收到两项任务。Beat 按北京时间在每天 00:00 调度日报，并在 00:00、08:00、16:00 调度 Token 轮换。
+无需等到整点即可验证 Redis 转发。在相同环境执行 `python manage.py shell -c "from inspection.tasks import rotate_probe_tokens, catch_up_daily_health_rates; rotate_probe_tokens.delay(); catch_up_daily_health_rates.delay()"`，检查 worker 日志收到两项任务。Beat 按北京时间在 00:00、08:00、16:00 调度 Token 轮换，每小时整点检查并补跑缺失的日报，每次最多补七天。
+
+受控 Token 认证默认关闭。可设置 `MANAGED_PROBE_ORIGIN=http://127.0.0.1:8000`，将该地址同时加入 `PROBE_ALLOWED_ORIGINS`，并给 Django 和 worker 配置同一个 `PROBE_TOKEN_ENCRYPTION_KEY`。创建服务后，把它的源设为该地址、路径设为 `/probe-health/<服务 ID>/`。首次轮换后触发巡检，预期目标返回 204。Django 验收配置已包含真实 HTTP 测试，验证新 Token 可用、旧 Token 被拒绝。

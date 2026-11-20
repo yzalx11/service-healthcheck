@@ -2,25 +2,17 @@ import secrets
 from datetime import date, datetime, time, timedelta
 
 from celery import shared_task
-from cryptography.fernet import Fernet
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.db import OperationalError, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, FilteredRelation, Max, Min, Q
 from django.utils import timezone
 
-from .models import DailyHealthRate, InspectionResult, Service
+from .models import DailyHealthRate, DailyHealthReportRun, InspectionResult, Service
+from .probe_tokens import token_cipher
 
 
 @shared_task(autoretry_for=(OperationalError,), retry_backoff=True)
 def rotate_probe_tokens():
-    key = settings.PROBE_TOKEN_ENCRYPTION_KEY
-    if not key:
-        raise ImproperlyConfigured("Set PROBE_TOKEN_ENCRYPTION_KEY before rotating tokens.")
-    try:
-        cipher = Fernet(key)
-    except ValueError:
-        raise ImproperlyConfigured("PROBE_TOKEN_ENCRYPTION_KEY must be a valid Fernet key.") from None
+    cipher = token_cipher()
 
     now = timezone.localtime(timezone.now(), timezone.get_default_timezone())
     window = now.replace(hour=now.hour // 8 * 8, minute=0, second=0, microsecond=0)
@@ -43,16 +35,21 @@ def write_daily_health_rates(report_date=None):
     day = date.fromisoformat(report_date) if report_date else today - timedelta(days=1)
     if day >= today:
         raise ValueError("The report date must be a completed calendar day.")
+    return _write_report(day, zone)
 
+
+def _write_report(day, zone):
     start = datetime.combine(day, time.min, tzinfo=zone)
     end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone)
     in_window = Q(inspections__checked_at__gte=start, inspections__checked_at__lt=end)
     with transaction.atomic():
-        services = Service.objects.select_related("environment", "team").annotate(
-            total=Count("inspections", filter=in_window),
+        services = Service.objects.select_related("environment", "team").alias(
+            daily_inspections=FilteredRelation("inspections", condition=in_window),
+        ).annotate(
+            total=Count("daily_inspections"),
             successful=Count(
-                "inspections",
-                filter=in_window & Q(inspections__outcome=InspectionResult.Outcome.HEALTHY),
+                "daily_inspections",
+                filter=Q(daily_inspections__outcome=InspectionResult.Outcome.HEALTHY),
             ),
         )
         rows = [
@@ -73,3 +70,25 @@ def write_daily_health_rates(report_date=None):
             update_fields=["environment_name", "team_name", "successful_checks", "total_checks"],
         )
     return len(rows)
+
+
+@shared_task(autoretry_for=(OperationalError,), retry_backoff=True)
+def catch_up_daily_health_rates():
+    zone = timezone.get_default_timezone()
+    yesterday = timezone.localdate(timezone=zone) - timedelta(days=1)
+    last_completed = DailyHealthReportRun.objects.aggregate(last=Max("date"))["last"]
+    if last_completed is not None:
+        first_date = last_completed + timedelta(days=1)
+    else:
+        earliest = InspectionResult.objects.aggregate(first=Min("checked_at"))["first"]
+        first_date = min(timezone.localdate(earliest, zone), yesterday) if earliest else yesterday
+
+    completed = 0
+    for offset in range(min(7, (yesterday - first_date).days + 1)):
+        day = first_date + timedelta(days=offset)
+        with transaction.atomic():
+            _, created = DailyHealthReportRun.objects.get_or_create(date=day)
+            if created:
+                _write_report(day, zone)
+                completed += 1
+    return completed

@@ -9,8 +9,9 @@ from rest_framework.test import APIClient
 
 from healthcheck.celery import app
 
-from .models import DailyHealthRate, Environment, InspectionResult, Service, Team
-from .tasks import rotate_probe_tokens, write_daily_health_rates
+from .models import DailyHealthRate, DailyHealthReportRun, Environment, InspectionResult, Service, Team
+from .serializers import ServiceSerializer
+from .tasks import catch_up_daily_health_rates, rotate_probe_tokens, write_daily_health_rates
 
 
 class ScheduledTaskTests(TestCase):
@@ -19,7 +20,7 @@ class ScheduledTaskTests(TestCase):
         self.assertEqual(app.conf.timezone, "Asia/Shanghai")
         expected = {
             "rotate-probe-tokens": (rotate_probe_tokens.name, {0, 8, 16}),
-            "write-daily-health-rates": (write_daily_health_rates.name, {0}),
+            "catch-up-daily-health-rates": (catch_up_daily_health_rates.name, set(range(24))),
         }
         for name, (task, hours) in expected.items():
             with self.subTest(name=name):
@@ -103,3 +104,58 @@ class ScheduledTaskTests(TestCase):
         idle = DailyHealthRate.objects.get(service=self.idle, date=start.date())
         self.assertEqual((idle.successful_checks, idle.total_checks), (0, 0))
         self.assertIsNone(idle.health_rate)
+
+    def test_catch_up_resumes_from_checkpoint_and_retries_failed_date(self):
+        now = datetime(2026, 11, 20, tzinfo=ZoneInfo("Asia/Shanghai"))
+        last = now.date() - timedelta(days=4)
+        DailyHealthReportRun.objects.create(date=last)
+        with patch("django.utils.timezone.now", return_value=now):
+            with patch("inspection.tasks._write_report", side_effect=RuntimeError("write failed")):
+                with self.assertRaises(RuntimeError):
+                    catch_up_daily_health_rates.run()
+            self.assertEqual(DailyHealthReportRun.objects.count(), 1)
+            self.assertEqual(catch_up_daily_health_rates.run(), 3)
+            self.assertEqual(catch_up_daily_health_rates.run(), 0)
+        self.assertEqual(
+            set(DailyHealthRate.objects.values_list("date", flat=True)),
+            {last + timedelta(days=offset) for offset in (1, 2, 3)},
+        )
+        self.assertEqual(DailyHealthRate.objects.count(), 6)
+
+    def test_service_update_preserves_tokens_rotated_after_read(self):
+        key = Fernet.generate_key()
+        now = datetime(2026, 11, 20, 8, tzinfo=ZoneInfo("Asia/Shanghai"))
+        validate = ServiceSerializer.validate
+        client = APIClient()
+        with override_settings(PROBE_TOKEN_ENCRYPTION_KEY=key):
+            with patch("django.utils.timezone.now", return_value=now):
+                self.assertEqual(rotate_probe_tokens.run(), 2)
+            for method, service in ((client.patch, self.active), (client.put, self.idle)):
+                with self.subTest(method=method.__name__):
+                    now += timedelta(hours=8)
+                    rotated = {}
+
+                    def rotate_after_validation(serializer, attrs):
+                        validated = validate(serializer, attrs)
+                        with patch("django.utils.timezone.now", return_value=now):
+                            rotate_probe_tokens.run()
+                        current = Service.objects.get(pk=service.pk)
+                        rotated.update(
+                            ciphertext=current.token_ciphertext, window=current.token_rotation_window,
+                        )
+                        return validated
+
+                    payload = {"health_path": "/ready"}
+                    if method == client.put:
+                        payload.update(
+                            name=service.name, environment=service.environment_id,
+                            team=service.team_id, origin=service.origin,
+                        )
+                    with patch.object(ServiceSerializer, "validate", rotate_after_validation):
+                        response = method(f"/api/services/{service.pk}/", payload, format="json")
+
+                    self.assertEqual(response.status_code, 200, response.data)
+                    service.refresh_from_db()
+                    self.assertEqual(service.health_path, "/ready")
+                    self.assertEqual(service.token_rotation_window, rotated["window"])
+                    self.assertEqual(service.token_ciphertext, rotated["ciphertext"])

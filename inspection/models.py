@@ -77,3 +77,7 @@ class DailyHealthRate(models.Model):
                 name="successful_checks_lte_total",
             ),
         ]
+
+
+class DailyHealthReportRun(models.Model):
+    date = models.DateField(primary_key=True)
