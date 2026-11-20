@@ -78,9 +78,9 @@ Invoke-RestMethod "$api/services/$($service.id)/check/" -Method Post
 Invoke-RestMethod 'http://127.0.0.1:8000/api/reports/?date=2026-11-20&environment=dev&team=Site%20Operations'
 ```
 
-每条记录返回日期、服务 ID、生成日报时的环境和团队、成功次数、总次数及 `health_rate`。健康率是 0 到 1 的比例，例如 `0.75` 表示 75%。没有巡检时为 `null`。结果按日期倒序、同一天按服务 ID 升序，每页 20 条。合法筛选没有匹配记录时返回空列表。非法参数返回 400，写请求返回 405。
+每条记录返回日期、服务 ID、生成日报时的环境和团队、成功次数、总次数及 `health_rate`。健康率是 0 到 1 的比例，例如 `0.75` 表示 75%。没有巡检时为 `null`。结果按日期倒序、同一天按服务 ID 升序，每页 20 条。可继续使用 `page` 分页和 `format=json` 选择响应格式。未知查询参数会以 `unknown_parameters` 返回 400。合法筛选没有匹配记录时返回空列表，写请求返回 405。
 
-在 VS Code「运行和调试」选择「验收：只读日报列表」，按 `Ctrl+F5`。预期显示 `Ran 5 tests` 和 `OK`。专项测试用临时数据库准备日报，无需启动 Django 开发服务或 Redis。
+在 VS Code「运行和调试」选择「验收：只读日报列表」，按 `Ctrl+F5`。预期显示 `Ran 6 tests` 和 `OK`。专项测试用临时数据库准备日报，无需启动 Django 开发服务或 Redis。
 
 ## 第二阶段验收
 

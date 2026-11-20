@@ -99,6 +99,13 @@ class DailyHealthReportTests(TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(field, response.json())
 
+    def test_unknown_parameters_are_rejected_even_with_supported_filters(self):
+        response = self.client.get(self.url, {
+            "date": self.day.isoformat(), "service": 1, "enviroment": "dev",
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"unknown_parameters": ["enviroment", "service"]})
+
     def test_list_is_paginated_and_read_only(self):
         DailyHealthRate.objects.bulk_create([
             DailyHealthRate(
@@ -109,12 +116,15 @@ class DailyHealthReportTests(TestCase):
             for offset in range(2, 20)
         ])
         first = self.client.get(self.url)
-        second = self.client.get(self.url, {"page": 2})
+        second = self.client.get(
+            self.url, {"page": 2, "format": "json"}, HTTP_ACCEPT="*/*"
+        )
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
         self.assertEqual(first.json()["count"], 22)
         self.assertEqual(len(first.json()["results"]), 20)
         self.assertEqual(len(second.json()["results"]), 2)
+        self.assertEqual(second.headers["Content-Type"], "application/json")
 
         for method in (self.client.post, self.client.put, self.client.patch, self.client.delete):
             with self.subTest(method=method.__name__):
