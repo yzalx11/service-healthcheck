@@ -12,7 +12,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "验收：Django 任务测试",
+            "name": "验收：Django 全量测试",
             "type": "debugpy",
             "request": "launch",
             "python": "${workspaceFolder}/.conda/python.exe",

@@ -17,7 +17,8 @@ def token_cipher():
 
 
 def is_managed_probe(service):
-    if service.origin != settings.MANAGED_PROBE_ORIGIN:
+    configured_origin = (settings.MANAGED_PROBE_ORIGIN or "").removesuffix("/")
+    if not configured_origin or service.origin.removesuffix("/") != configured_origin:
         return False
     origin = urlsplit(service.origin)
     if origin.scheme != "https" and origin.hostname not in {"127.0.0.1", "::1"}:
