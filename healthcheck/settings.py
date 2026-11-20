@@ -13,7 +13,22 @@ INSTALLED_APPS = [
     "rest_framework",
     "inspection",
 ]
-MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
+MIDDLEWARE = [
+    "healthcheck.middleware.RequestTimingMiddleware",
+    "django.middleware.common.CommonMiddleware",
+]
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"request_timing_console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "healthcheck.request_timing": {
+            "handlers": ["request_timing_console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
 TEMPLATES = [
     {"BACKEND": "django.template.backends.django.DjangoTemplates", "APP_DIRS": True}
 ]
