@@ -16,6 +16,7 @@ from .probe_tokens import is_managed_probe, token_cipher
 from .probes import check_service
 from .serializers import (
     EnvironmentSerializer,
+    InspectionHistoryFilterSerializer,
     InspectionResultSerializer,
     ServiceSerializer,
     TeamSerializer,
@@ -64,6 +65,21 @@ class TeamViewSet(InspectionModelViewSet):
 class ServiceViewSet(InspectionModelViewSet):
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
+
+    @action(detail=True, serializer_class=InspectionResultSerializer)
+    def inspections(self, request, pk=None):
+        service = self.get_object()
+        filters = InspectionHistoryFilterSerializer(data=request.query_params.dict())
+        filters.is_valid(raise_exception=True)
+        fields = {"outcome": "outcome", "since": "checked_at__gte", "until": "checked_at__lt"}
+        results = service.inspections.filter(
+            **{fields[name]: value for name, value in filters.validated_data.items()}
+        ).order_by("-checked_at", "-pk")
+        page = self.paginate_queryset(results)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(self.get_serializer(results, many=True).data)
 
     @action(detail=True, methods=["post"])
     def check(self, request, pk=None):

@@ -57,3 +57,14 @@ class InspectionResultSerializer(serializers.ModelSerializer):
         model = InspectionResult
         fields = ["id", "service", "checked_at", "outcome", "status_code", "duration_ms"]
         read_only_fields = fields
+
+
+class InspectionHistoryFilterSerializer(serializers.Serializer):
+    outcome = serializers.ChoiceField(choices=InspectionResult.Outcome.choices, required=False)
+    since = serializers.DateTimeField(required=False)
+    until = serializers.DateTimeField(required=False)
+
+    def validate(self, attrs):
+        if "since" in attrs and "until" in attrs and attrs["since"] >= attrs["until"]:
+            raise serializers.ValidationError({"until": "Must be later than since."})
+        return attrs

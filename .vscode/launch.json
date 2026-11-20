@@ -22,6 +22,16 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "验收：巡检历史",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.conda/python.exe",
+            "program": "${workspaceFolder}/manage.py",
+            "args": ["test", "inspection.test_inspection_history"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "验收：Celery 完整链路",
             "type": "debugpy",
             "request": "launch",
