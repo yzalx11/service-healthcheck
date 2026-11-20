@@ -5,3 +5,4 @@ __pycache__/
 db.sqlite3
 .env
 celerybeat-schedule*
+/django 项目笔试题v7（备选 3 套）(1).md
