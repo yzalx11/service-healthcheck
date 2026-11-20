@@ -7,7 +7,11 @@ from .models import Environment, InspectionResult, Service, Team
 
 
 def origin_is_allowed(origin):
-    return origin in settings.PROBE_ALLOWED_ORIGINS
+    normalized_origin = origin.removesuffix("/")
+    return any(
+        configured.removesuffix("/") == normalized_origin
+        for configured in settings.PROBE_ALLOWED_ORIGINS
+    )
 
 
 class EnvironmentSerializer(serializers.ModelSerializer):

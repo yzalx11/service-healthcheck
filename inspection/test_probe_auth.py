@@ -47,8 +47,8 @@ class ManagedProbeTests(LiveServerTestCase):
             self.assertEqual(response.data["outcome"], "healthy")
 
         with override_settings(
-            MANAGED_PROBE_ORIGIN=self.live_server_url,
-            PROBE_ALLOWED_ORIGINS=[self.live_server_url],
+            MANAGED_PROBE_ORIGIN=self.live_server_url + "/",
+            PROBE_ALLOWED_ORIGINS=[self.live_server_url + "/"],
             PROBE_TOKEN_ENCRYPTION_KEY=key,
         ), patch("django.utils.timezone.now", return_value=now) as clock:
             self.assertEqual(rotate_probe_tokens.run(), 1)
