@@ -184,6 +184,24 @@ class ServiceApiTests(TestCase):
         result = InspectionResult.objects.get(service_id=service_id)
         self.assertEqual((result.outcome, result.status_code), ("healthy", 200))
 
+    def test_idn_allowlist_matches_unicode_and_punycode_in_both_directions(self):
+        unicode_origin = "http://例子.中国:8080"
+        ascii_origin = "http://xn--fsqu00a.xn--fiqs8s:8080"
+        for allowed, submitted in ((ascii_origin, unicode_origin), (unicode_origin, ascii_origin)):
+            with self.subTest(allowed=allowed), override_settings(PROBE_ALLOWED_ORIGINS=[allowed]):
+                response = self.client.put(
+                    self.service_url, {**self.payload, "origin": submitted}, format="json"
+                )
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(response.data["origin"], submitted)
+
+                with patch("inspection.probes.HTTPConnection") as connection:
+                    upstream = connection.return_value
+                    upstream.getresponse.return_value.__enter__.return_value.status = 200
+                    checked = self.client.post(self.service_url + "check/")
+                self.assertEqual(checked.status_code, 201, checked.data)
+                self.assertEqual(checked.data["outcome"], "healthy")
+
     def test_short_hostname_trailing_dot_is_preserved_and_requires_exact_allowlist(self):
         payload = {**self.payload, "origin": "https://svc-01.:8443/"}
         with override_settings(PROBE_ALLOWED_ORIGINS=["https://svc-01:8443"]):

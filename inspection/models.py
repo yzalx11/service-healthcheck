@@ -1,5 +1,7 @@
 from django.db import models
 
+from .origins import validate_origin_syntax
+
 
 class Environment(models.Model):
     class Name(models.TextChoices):
@@ -24,7 +26,7 @@ class Service(models.Model):
     name = models.CharField(max_length=100)
     environment = models.ForeignKey(Environment, on_delete=models.PROTECT)
     team = models.ForeignKey(Team, on_delete=models.PROTECT)
-    origin = models.URLField()
+    origin = models.CharField(max_length=200, validators=[validate_origin_syntax])
     health_path = models.CharField(max_length=255, default="/health")
     token_ciphertext = models.BinaryField(null=True, editable=False)
     token_rotation_window = models.DateTimeField(null=True, editable=False)

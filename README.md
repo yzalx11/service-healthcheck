@@ -60,6 +60,10 @@ Invoke-RestMethod "$api/services/$($service.id)/check/" -Method Post
 
 支持 `http://paysvc:8080` 这类内网短主机名。运行 Django 的环境需要能解析该名称。主机名末尾的点会保留，`paysvc` 和 `paysvc.` 分别匹配白名单。Origin 内的空白和控制字符会被拒绝。
 
+国际化域名按 Python 内置的 IDNA2003 规则匹配。Unicode 域名与按该规则生成的 ASCII 写法等价。部分域名在 IDNA2008 下的结果不同，例如 `straße.de` 在这里匹配 `strasse.de`，而 IDNA2008 的 ASCII 写法是 `xn--strae-oqa.de`。
+
+修改 `PROBE_ALLOWED_ORIGINS` 或 `MANAGED_PROBE_ORIGIN` 后，可以运行 `python manage.py check` 检查配置。无效的白名单条目会报 `inspection.W001` 并被忽略，无效的受控目标会报 `inspection.W002` 并禁用受控探测。告警以配置名开头，省略原始值。更新到此版本后运行 `python manage.py migrate` 应用服务模型字段迁移。
+
 ## 第二阶段验收
 
 先安装更新后的依赖并执行 `python manage.py migrate`。在 Windows 的 Conda 终端可单独执行任务，验证算法和数据库写入。先在 API 创建至少一个服务。以下命令生成仅供本次验收使用的加密密钥，避免直接输出密钥或 Token。
