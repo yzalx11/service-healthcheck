@@ -84,3 +84,22 @@ python -m celery -A healthcheck beat --loglevel=INFO
 无需等到整点即可验证 Redis 转发。在相同环境执行 `python manage.py shell -c "from inspection.tasks import rotate_probe_tokens, catch_up_daily_health_rates; rotate_probe_tokens.delay(); catch_up_daily_health_rates.delay()"`，检查 worker 日志收到两项任务。Beat 按北京时间在 00:00、08:00、16:00 调度 Token 轮换，每小时整点检查并补跑缺失的日报，每次最多补七天。
 
 受控 Token 认证默认关闭。可设置 `MANAGED_PROBE_ORIGIN=http://127.0.0.1:8000`，将该地址同时加入 `PROBE_ALLOWED_ORIGINS`，并给 Django 和 worker 配置同一个 `PROBE_TOKEN_ENCRYPTION_KEY`。创建服务后，把它的源设为该地址、路径设为 `/probe-health/<服务 ID>/`。首次轮换后触发巡检，预期目标返回 204。Django 验收配置已包含真实 HTTP 测试，验证新 Token 可用、旧 Token 被拒绝。
+
+## 第三阶段验收
+
+在 VS Code「运行和调试」中选择「验收：请求耗时中间件」，按 `Ctrl+F5`。预期显示 `Ran 2 tests` 和 `OK`。测试验证正常响应和 404 的耗时响应头及日志。
+
+也可在项目根目录执行：
+
+```powershell
+& .\.conda\python.exe manage.py test inspection.test_request_timing
+```
+
+手动验收时，启动此分支的 Django 后，分别请求 API 首页和不存在的路径。
+
+```powershell
+curl.exe -i http://127.0.0.1:8000/api/
+curl.exe -i http://127.0.0.1:8000/missing-route/
+```
+
+两次响应都应包含形如 `Server-Timing: app;dur=1.235` 的响应头，单位为毫秒。Django 终端会打印对应的 `method`、`route`、`status` 和 `duration_ms`。404 的路由显示为 `<unmatched>`。验收无需启动 Redis、worker 或 beat。

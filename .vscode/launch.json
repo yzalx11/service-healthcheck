@@ -2,6 +2,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "验收：请求耗时中间件",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.conda/python.exe",
+            "program": "${workspaceFolder}/manage.py",
+            "args": ["test", "inspection.test_request_timing"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "验收：Django 任务测试",
             "type": "debugpy",
             "request": "launch",
