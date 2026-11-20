@@ -27,6 +27,13 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
         fields = ["id", "name", "environment", "team", "origin", "health_path"]
 
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        # A scheduled rotation may have updated the credential since this instance was read.
+        instance.save(update_fields=validated_data.keys())
+        return instance
+
     def validate_origin(self, value):
         try:
             parsed = urlsplit(value)

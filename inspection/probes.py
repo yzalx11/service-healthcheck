@@ -5,9 +5,14 @@ from urllib.parse import urlsplit
 from django.conf import settings
 
 from .models import InspectionResult
+from .probe_tokens import is_managed_probe, token_cipher
 
 
 def check_service(service):
+    headers = {}
+    if is_managed_probe(service) and service.token_ciphertext:
+        headers["Authorization"] = "Bearer " + token_cipher().decrypt(service.token_ciphertext).decode("ascii")
+
     origin = urlsplit(service.origin)
     connection_type = HTTPSConnection if origin.scheme == "https" else HTTPConnection
     connection = connection_type(
@@ -18,7 +23,7 @@ def check_service(service):
     outcomes = InspectionResult.Outcome
 
     try:
-        connection.request("GET", service.health_path)
+        connection.request("GET", service.health_path, headers=headers)
         with connection.getresponse() as response:
             status_code = response.status
         outcome = outcomes.HEALTHY if 200 <= status_code < 300 else outcomes.HTTP_ERROR
