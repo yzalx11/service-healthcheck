@@ -25,10 +25,16 @@ conda create --prefix .\.conda python=3.12 pip -y
 conda activate .\.conda
 python -m pip install -r requirements.txt
 python manage.py migrate
-python manage.py runserver
+python manage.py runserver 127.0.0.1:8000 --insecure
 ```
 
 若 Windows的 `conda.exe` 无法启动，可以在上述创建命令中用 `& D:\Anaconda3\python.exe -m conda` 代替 `conda`，然后直接用 `& .\.conda\python.exe` 执行后续 Python 命令。
+
+默认 `DEBUG=False`。访问 [API 首页](http://127.0.0.1:8000/api/) 仍可使用 DRF 的浏览器页面。上面的 `--insecure` 只让 Django 开发服务在调试关闭时提供本地静态文件，例如 DRF 的 CSS 和 JavaScript。404 和 500 返回通用页面，未处理异常的详情留在 Django 服务端日志。
+
+需要固定密钥时，从环境注入 `DJANGO_SECRET_KEY`。未配置时每个进程会生成临时密钥，重启后原有签名数据可能失效。允许的 Host 默认为回环地址和 `localhost`，可用逗号分隔的 `DJANGO_ALLOWED_HOSTS` 覆盖。验收时保持 `DJANGO_DEBUG` 未设置或为 `0`。
+
+错误响应和 DRF 页面回归测试可用 VS Code「验收：Django 全量测试」运行，也可单独执行 `python manage.py test inspection.test_error_responses`。
 
 ## 接口
 
