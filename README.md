@@ -34,6 +34,28 @@ python manage.py runserver
 
 环境、团队、服务分别在 `/api/environments/`、`/api/teams/`、`/api/services/`。集合支持 GET 和 POST，详情地址加上 ID 后支持 GET、PUT、PATCH 和 DELETE。环境名称取 `dev`、`test` 或 `prod`。当前 API 面向本地验收。
 
+### 巡检历史
+
+使用 `GET /api/services/{id}/inspections/` 查看指定服务的巡检记录。每条记录含巡检时间、结果类型、目标 HTTP 状态码和探测耗时。超时或连接失败时，目标状态码为 `null`。列表按时间倒序排列，时间相同时较新的记录 ID 排在前面。默认每页 20 条，可用 `?page=2` 查看第二页。服务存在但没有历史时返回空列表，服务不存在时返回 404。
+
+支持组合筛选。三个参数均可省略，也可只提供一个时间边界。
+
+| 参数 | 用途 |
+| --- | --- |
+| `outcome` | `healthy`、`http_error`、`timeout` 或 `connection_error` |
+| `since` | 起始时间，包含该时刻 |
+| `until` | 结束时间，排除该时刻 |
+
+时间参数使用 ISO 8601。建议带时区偏移或 `Z`，省略时区时按项目时区 `Asia/Shanghai` 解释。两个边界同时提供时，`until` 必须晚于 `since`，否则返回 400。以下示例查询北京时间 09:00 至 10:00 之间的超时记录。
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:8000/api/services/1/inspections/?outcome=timeout&since=2026-11-21T01:00:00Z&until=2026-11-21T02:00:00Z'
+```
+
+在 VS Code「运行和调试」中选择「验收：巡检历史」，按 `Ctrl+F5`，预期显示 `Ran 7 tests` 和 `OK`。也可执行 `python manage.py test inspection.test_inspection_history`。测试无需启动 Redis。
+
+### 按需触发巡检
+
 在另一个终端启动用于验收的本地 HTTP 服务。`/` 返回 200，一个不存在的路径返回 404。
 
 ```powershell
