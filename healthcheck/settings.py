@@ -9,10 +9,15 @@ ROOT_URLCONF = "healthcheck.urls"
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.staticfiles",
     "rest_framework",
     "inspection",
 ]
 MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
+TEMPLATES = [
+    {"BACKEND": "django.template.backends.django.DjangoTemplates", "APP_DIRS": True}
+]
+STATIC_URL = "/static/"
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 TIME_ZONE = "Asia/Shanghai"
