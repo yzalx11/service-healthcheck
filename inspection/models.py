@@ -26,6 +26,8 @@ class Service(models.Model):
     team = models.ForeignKey(Team, on_delete=models.PROTECT)
     origin = models.URLField()
     health_path = models.CharField(max_length=255, default="/health")
+    token_ciphertext = models.BinaryField(null=True, editable=False)
+    token_rotation_window = models.DateTimeField(null=True, editable=False)
 
     class Meta:
         ordering = ["id"]
@@ -51,3 +53,27 @@ class InspectionResult(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["service", "checked_at"], name="inspection_service_time")]
+
+
+class DailyHealthRate(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="daily_health_rates")
+    date = models.DateField()
+    environment_name = models.CharField(max_length=4)
+    team_name = models.CharField(max_length=100)
+    successful_checks = models.PositiveBigIntegerField()
+    total_checks = models.PositiveBigIntegerField()
+
+    @property
+    def health_rate(self):
+        if self.total_checks:
+            return self.successful_checks / self.total_checks
+        return None
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["date", "service"], name="unique_service_health_date"),
+            models.CheckConstraint(
+                condition=models.Q(successful_checks__lte=models.F("total_checks")),
+                name="successful_checks_lte_total",
+            ),
+        ]

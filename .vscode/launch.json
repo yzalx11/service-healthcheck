@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "验收：Django 任务测试",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.conda/python.exe",
+            "program": "${workspaceFolder}/manage.py",
+            "args": ["test", "inspection.test_tasks"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "验收：Celery 完整链路",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.conda/python.exe",
+            "program": "${workspaceFolder}/test_celery_chain.py",
+            "args": ["--redis-server", "${input:redisServerPath}"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "subProcess": false
+        }
+    ],
+    "inputs": [
+        {
+            "id": "redisServerPath",
+            "type": "promptString",
+            "description": "Redis 服务端程序路径",
+            "default": "D:\\redis\\Redis-x64-3.2.100\\redis-server.exe"
+        }
+    ]
+}
